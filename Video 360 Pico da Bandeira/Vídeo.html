@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+</head>
+
+<body style="margin:0; overflow:hidden;">
+
+<script>
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+document.body.appendChild(renderer.domElement);
+
+
+// ==================================================
+// ESFERA 360°
+// ==================================================
+
+const geometry = new THREE.SphereGeometry(
+    100,
+    64,
+    64
+);
+
+// Visualizar a esfera por dentro
+geometry.scale(-1, 1, 1);
+
+
+// ==================================================
+// VÍDEO 360°
+// ==================================================
+
+const video = document.createElement('video');
+
+// IMPORTANTE:
+// O vídeo deve estar na mesma pasta do Video.html
+video.src = 'SEU_VIDEO_360.mp4';
+
+video.crossOrigin = 'anonymous';
+
+video.loop = true;
+video.muted = true;
+video.playsInline = true;
+
+video.setAttribute('playsinline', '');
+video.setAttribute('webkit-playsinline', '');
+
+
+// Tenta iniciar o vídeo
+video.play().catch(error => {
+    console.log("O navegador bloqueou o autoplay:", error);
+});
+
+
+// ==================================================
+// TEXTURA DO VÍDEO
+// ==================================================
+
+const texture = new THREE.VideoTexture(video);
+
+texture.colorSpace = THREE.SRGBColorSpace;
+
+texture.minFilter = THREE.LinearFilter;
+texture.magFilter = THREE.LinearFilter;
+
+
+// ==================================================
+// MATERIAL
+// ==================================================
+
+const material = new THREE.MeshBasicMaterial({
+    map: texture
+});
+
+
+// ==================================================
+// ESFERA
+// ==================================================
+
+const sphere = new THREE.Mesh(
+    geometry,
+    material
+);
+
+scene.add(sphere);
+
+
+// Câmera dentro da esfera
+camera.position.set(0, 0, 0);
+
+
+// ==================================================
+// CONTROLE DO MOUSE
+// ==================================================
+
+let isDragging = false;
+
+let previousX = 0;
+let previousY = 0;
+
+
+document.addEventListener('mousedown', function(e) {
+
+    isDragging = true;
+
+    previousX = e.clientX;
+    previousY = e.clientY;
+
+});
+
+
+document.addEventListener('mouseup', function() {
+
+    isDragging = false;
+
+});
+
+
+document.addEventListener('mousemove', function(e) {
+
+    if (!isDragging) return;
+
+
+    const deltaX =
+        e.clientX - previousX;
+
+    const deltaY =
+        e.clientY - previousY;
+
+
+    sphere.rotation.y +=
+        deltaX * 0.005;
+
+
+    sphere.rotation.x +=
+        deltaY * 0.005;
+
+
+    // Limita a rotação vertical
+    const limite = Math.PI / 2;
+
+    sphere.rotation.x = Math.max(
+        -limite,
+        Math.min(
+            limite,
+            sphere.rotation.x
+        )
+    );
+
+
+    previousX = e.clientX;
+    previousY = e.clientY;
+
+});
+
+
+// ==================================================
+// ANIMAÇÃO
+// ==================================================
+
+function animate() {
+
+    requestAnimationFrame(animate);
+
+    renderer.render(
+        scene,
+        camera
+    );
+
+}
+
+animate();
+
+
+// ==================================================
+// REDIMENSIONAMENTO DA JANELA
+// ==================================================
+
+window.addEventListener('resize', function() {
+
+    camera.aspect =
+        window.innerWidth /
+        window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+
+});
+
+</script>
+
+</body>
+</html>

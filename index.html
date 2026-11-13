@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WebGIS 3D • Parque Estadual da Serra do Tabuleiro</title>
+    
+    <!-- Meta tags -->
+    <meta name="description" content="WebGIS 3D interativo do Parque Estadual da Serra do Tabuleiro com modelo digital de elevação, ortofoto Sentinel-2 e imersão em vídeo 360° do Pico da Bandeira / Cambirela.">
+
+    <!-- Three.js Import Map (Local with CDN Fallback) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./libs/three.module.js",
+            "three/addons/": "./libs/addons/"
+        }
+    }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-glass: rgba(13, 20, 36, 0.78);
+            --bg-glass-card: rgba(18, 28, 51, 0.88);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --accent-emerald: #10b981;
+            --accent-emerald-glow: rgba(16, 185, 129, 0.4);
+            --accent-cyan: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --radius-sm: 6px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #080c16;
+            color: var(--text-main);
+            font-family: var(--font-main);
+        }
+
+        #webgl-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            outline: none;
+            cursor: grab;
+        }
+
+        #webgl-canvas:active {
+            cursor: grabbing;
+        }
+
+        /* Top Header HUD */
+        .hud-header {
+            position: absolute;
+            top: 18px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            pointer-events: none;
+        }
+
+        .hud-brand {
+            pointer-events: auto;
+            background: var(--bg-glass);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-lg);
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .hud-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #059669, #0284c7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 4px 15px var(--accent-emerald-glow);
+        }
+
+        .hud-titles h1 {
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hud-titles h1 span.badge {
+            font-size: 10px;
+            font-weight: 600;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            padding: 2px 7px;
+            border-radius: 100px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .hud-titles p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Mode Pill */
+        .mode-pill {
+            pointer-events: auto;
+            background: var(--bg-glass);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-glass);
+            border-radius: 100px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .mode-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-emerald);
+            box-shadow: 0 0 10px var(--accent-emerald);
+            animation: pulse-dot 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Top Right Tools Panel */
+        .hud-tools {
+            position: absolute;
+            top: 18px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tool-btn {
+            background: var(--bg-glass);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-family: var(--font-main);
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .tool-btn:hover {
+            background: rgba(30, 41, 59, 0.9);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .tool-btn:active {
+            transform: translateY(0);
+        }
+
+        .tool-btn.highlight {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.85), rgba(220, 38, 38, 0.95));
+            border-color: rgba(254, 202, 202, 0.4);
+            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.45);
+        }
+
+        .tool-btn.highlight:hover {
+            background: linear-gradient(135deg, rgba(248, 113, 113, 0.95), rgba(239, 68, 68, 1));
+            box-shadow: 0 8px 30px rgba(239, 68, 68, 0.65);
+        }
+
+        .tool-btn .icon {
+            font-size: 16px;
+        }
+
+        /* Bottom Status & Coordinates HUD */
+        .hud-status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .coords-card {
+            pointer-events: auto;
+            background: var(--bg-glass);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .coords-card span.val {
+            color: #38bdf8;
+            font-weight: 500;
+        }
+
+        .coords-card .sep {
+            width: 1px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 3D Floating Flag Pin in Screen-Space */
+        .flag-pin-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 15;
+            transform: translate(-50%, -100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .flag-pin-card {
+            pointer-events: auto;
+            background: linear-gradient(135deg, rgba(24, 24, 38, 0.95), rgba(15, 23, 42, 0.95));
+            border: 1px solid rgba(239, 68, 68, 0.6);
+            border-radius: 12px;
+            padding: 10px 14px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 25px rgba(239, 68, 68, 0.35);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: bounce-pin 2.5s infinite ease-in-out;
+        }
+
+        @keyframes bounce-pin {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .flag-pin-card:hover {
+            transform: scale(1.08) translateY(-4px);
+            border-color: #f87171;
+            box-shadow: 0 15px 40px rgba(239, 68, 68, 0.55), 0 0 35px rgba(239, 68, 68, 0.6);
+        }
+
+        .flag-pin-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.5);
+        }
+
+        .flag-pin-text h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .flag-pin-text p {
+            font-size: 11px;
+            color: #fca5a5;
+            margin-top: 1px;
+            font-weight: 500;
+        }
+
+        .flag-pin-arrow {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 10px solid rgba(239, 68, 68, 0.9);
+            margin-top: -1px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+
+        /* Teleport Transition Effect Overlay */
+        #teleport-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            background: radial-gradient(circle, rgba(239,68,68,0.2) 0%, rgba(8,12,22,0.95) 70%, rgba(0,0,0,1) 100%);
+            backdrop-filter: blur(0px);
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), backdrop-filter 0.8s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #teleport-overlay.active {
+            opacity: 1;
+            backdrop-filter: blur(16px);
+        }
+
+        .teleport-loader {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(239, 68, 68, 0.2);
+            border-top-color: #ef4444;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .teleport-text {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #fff;
+            text-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+        }
+
+        /* 360 Video Player HUD */
+        #vr-player-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #vr-player-ui.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .vr-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            pointer-events: auto;
+        }
+
+        .btn-back-map {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.95));
+            border: 1px solid rgba(167, 243, 208, 0.4);
+            border-radius: var(--radius-lg);
+            padding: 12px 22px;
+            color: #fff;
+            font-family: var(--font-main);
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn-back-map:hover {
+            transform: scale(1.04);
+            background: linear-gradient(135deg, #10b981, #047857);
+            box-shadow: 0 12px 35px rgba(16, 185, 129, 0.6);
+        }
+
+        .vr-title-card {
+            background: var(--bg-glass-card);
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-lg);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .vr-title-card h2 {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .vr-title-card span.badge-360 {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 100px;
+            letter-spacing: 0.5px;
+        }
+
+        .vr-compass-bearing {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--accent-cyan);
+            background: rgba(6, 182, 212, 0.15);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        /* VR Bottom Controls Bar */
+        .vr-bottom-bar {
+            align-self: center;
+            width: 100%;
+            max-width: 860px;
+            background: var(--bg-glass-card);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-lg);
+            padding: 14px 22px;
+            pointer-events: auto;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .vr-scrubber-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .vr-timeline {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 100px;
+            outline: none;
+            cursor: pointer;
+            transition: height 0.15s ease;
+        }
+
+        .vr-timeline:hover {
+            height: 9px;
+        }
+
+        .vr-timeline::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .vr-timeline::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+
+        .vr-time-display {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 95px;
+            text-align: right;
+        }
+
+        .vr-buttons-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .vr-controls-left, .vr-controls-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .vr-ctrl-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-md);
+            padding: 8px 14px;
+            color: var(--text-main);
+            font-family: var(--font-main);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .vr-ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .vr-ctrl-btn.active {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.6);
+            color: #fca5a5;
+        }
+
+        /* Volume slider */
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vr-volume-slider {
+            -webkit-appearance: none;
+            width: 70px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 100px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .vr-volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #080c16;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            transition: opacity 0.6s ease;
+        }
+
+        .loader-spinner {
+            width: 56px;
+            height: 56px;
+            border: 4px solid rgba(16, 185, 129, 0.15);
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loader-title {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .loader-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .loader-bar-bg {
+            width: 280px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 100px;
+            overflow: hidden;
+        }
+
+        .loader-bar-fill {
+            height: 100%;
+            width: 15%;
+            background: linear-gradient(90deg, #10b981, #06b6d4);
+            border-radius: 100px;
+            transition: width 0.3s ease;
+        }
+
+        /* Modal Dialog */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-box {
+            width: 100%;
+            max-width: 580px;
+            background: var(--bg-glass-card);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            position: relative;
+        }
+
+        .modal-box h2 {
+            font-size: 19px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-box p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #cbd5e1;
+            margin-bottom: 14px;
+        }
+
+        .modal-box ul {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: 20px;
+            margin-bottom: 18px;
+            line-height: 1.6;
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Protocol Alert Banner (if opened via file://) */
+        #protocol-alert {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            background: rgba(245, 158, 11, 0.95);
+            color: #000;
+            border-radius: var(--radius-md);
+            padding: 10px 18px;
+            font-size: 12px;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        }
+
+        @media (max-width: 768px) {
+            .hud-header {
+                top: 10px;
+                left: 10px;
+            }
+            .hud-brand {
+                padding: 8px 12px;
+            }
+            .hud-titles h1 {
+                font-size: 14px;
+            }
+            .mode-pill {
+                display: none;
+            }
+            .hud-tools {
+                top: 10px;
+                right: 10px;
+            }
+            .coords-card {
+                display: none;
+            }
+            .vr-bottom-bar {
+                padding: 12px 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Top Left Header HUD -->
+    <header class="hud-header">
+        <div class="hud-brand">
+            <div class="hud-logo">⛰️</div>
+            <div class="hud-titles">
+                <h1>Serra do Tabuleiro <span class="badge">WebGIS 3D</span></h1>
+                <p>Parque Estadual • Santa Catarina</p>
+            </div>
+        </div>
+        <div class="mode-pill" id="hud-mode-pill">
+            <div class="mode-dot"></div>
+            <span id="hud-mode-text">Modo Terreno 3D</span>
+        </div>
+    </header>
+
+    <!-- Top Right Tools Toolbar -->
+    <div class="hud-tools" id="hud-tools">
+        <button class="tool-btn highlight" id="btn-focus-flag" title="Ir diretamente para a Bandeira e Mirante 360°">
+            <span class="icon">🚩</span>
+            <span>Pico da Bandeira (360°)</span>
+        </button>
+        <button class="tool-btn" id="btn-reset-cam" title="Visão Geral do Parque">
+            <span class="icon">🔄</span>
+            <span>Visão Geral</span>
+        </button>
+        <button class="tool-btn" id="btn-top-view" title="Vista Aérea Vertical (Nadir)">
+            <span class="icon">🧭</span>
+            <span>Vista Aérea</span>
+        </button>
+        <button class="tool-btn" id="btn-toggle-clouds" title="Ligar ou Desligar Camada de Nuvens">
+            <span class="icon">☁️</span>
+            <span id="lbl-clouds">Ocultar Nuvens</span>
+        </button>
+        <button class="tool-btn" id="btn-toggle-sun" title="Alternar Luz Solar / Pôr do Sol">
+            <span class="icon">☀️</span>
+            <span id="lbl-sun">Pôr do Sol</span>
+        </button>
+        <button class="tool-btn" id="btn-auto-rotate" title="Girar Maquete 3D Continuamente">
+            <span class="icon">🪐</span>
+            <span id="lbl-orbit">Giro Automático</span>
+        </button>
+        <button class="tool-btn" id="btn-info" title="Informações Geográficas">
+            <span class="icon">ℹ️</span>
+            <span>Sobre o Parque</span>
+        </button>
+    </div>
+
+    <!-- Bottom Coordinates HUD -->
+    <div class="hud-status" id="hud-status">
+        <div class="coords-card">
+            <span>UTM SC 22S:</span>
+            <span>X: <span class="val" id="hud-utm-x">724.995 m</span></span>
+            <span class="sep"></span>
+            <span>Y: <span class="val" id="hud-utm-y">6.925.439 m</span></span>
+            <span class="sep"></span>
+            <span>Altitude MDE: <span class="val" id="hud-elevation">1.043 m (Pico da Bandeira)</span></span>
+        </div>
+    </div>
+
+    <!-- 3D Floating Flag Pin in Screen-Space -->
+    <div class="flag-pin-container" id="flag-pin">
+        <div class="flag-pin-card" id="flag-pin-card" title="Clique para entrar no Vídeo 360°!">
+            <div class="flag-pin-icon">🚩</div>
+            <div class="flag-pin-text">
+                <h3>Pico da Bandeira (724995, 6925439)</h3>
+                <p>▶ Clique para Entrar no Vídeo 360°</p>
+            </div>
+        </div>
+        <div class="flag-pin-arrow"></div>
+    </div>
+
+    <!-- Teleport Transition Overlay -->
+    <div id="teleport-overlay">
+        <div class="teleport-loader"></div>
+        <div class="teleport-text" id="teleport-text">TELETRANSPORTANDO PARA O VÍDEO 360°...</div>
+    </div>
+
+    <!-- 360 VR Player HUD (Visible in 360 Mode) -->
+    <div id="vr-player-ui">
+        <div class="vr-top-bar">
+            <button class="btn-back-map" id="btn-back-to-gis">
+                <span>←</span>
+                <span>VOLTAR AO WEBGIS 3D</span>
+            </button>
+            <div class="vr-title-card">
+                <h2>Mirante do Pico da Bandeira / Cambirela</h2>
+                <span class="badge-360">VÍDEO 360° VR 4K</span>
+                <span class="vr-compass-bearing" id="vr-heading">NORTE 0°</span>
+            </div>
+            <div></div> <!-- Spacer -->
+        </div>
+
+        <div class="vr-bottom-bar">
+            <div class="vr-scrubber-row">
+                <input type="range" class="vr-timeline" id="vr-timeline" min="0" max="100" value="0" step="0.1">
+                <div class="vr-time-display" id="vr-time">00:00 / 10:07</div>
+            </div>
+            <div class="vr-buttons-row">
+                <div class="vr-controls-left">
+                    <button class="vr-ctrl-btn" id="vr-btn-play">
+                        <span id="vr-icon-play">⏸️</span>
+                        <span id="vr-lbl-play">Pausar</span>
+                    </button>
+                    <div class="volume-container">
+                        <button class="vr-ctrl-btn" id="vr-btn-mute">
+                            <span id="vr-icon-mute">🔊</span>
+                        </button>
+                        <input type="range" class="vr-volume-slider" id="vr-vol" min="0" max="1" step="0.05" value="1">
+                    </div>
+                </div>
+                <div class="vr-controls-right">
+                    <button class="vr-ctrl-btn" id="vr-btn-pan">
+                        <span>🔄</span>
+                        <span id="vr-lbl-pan">Pan Automático</span>
+                    </button>
+                    <button class="vr-ctrl-btn" id="vr-btn-fullscreen">
+                        <span>⛶</span>
+                        <span>Tela Cheia</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loader-spinner"></div>
+        <div class="loader-title">Carregando Serra do Tabuleiro 3D...</div>
+        <div class="loader-desc" id="loading-desc">Inicializando WebGL e texturas de satélite Sentinel-2...</div>
+        <div class="loader-bar-bg">
+            <div class="loader-bar-fill" id="loading-bar"></div>
+        </div>
+    </div>
+
+    <!-- Information Modal -->
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-box">
+            <button class="modal-close-btn" id="modal-close">✕</button>
+            <h2>⛰️ Parque Estadual da Serra do Tabuleiro</h2>
+            <p>
+                O <strong>Parque Estadual da Serra do Tabuleiro (PAEST)</strong> é a maior unidade de conservação de proteção integral de Santa Catarina, cobrindo cerca de 84.130 hectares distribuídos em nove municípios, incluindo Palhoça e Santo Amaro da Imperatriz.
+            </p>
+            <p>
+                <strong>Dados e Recursos Integrados neste WebGIS:</strong>
+            </p>
+            <ul>
+                <li><strong>Modelo Digital de Elevação (MDE):</strong> Topografia SRTM 30m com interpolação tridimensional e exagero vertical geomorfológico (4.5x).</li>
+                <li><strong>Ortoimagem de Satélite:</strong> Imagem multiespectral da constelação ESA Sentinel-2 L1C (10 de Março de 2020).</li>
+                <li><strong>Imersão 360° no Pico da Bandeira / Cambirela:</strong> Vídeo equirretangular em alta definição gravado no ponto culminante panorâmico com visão 360° entre a serra e o oceano Atlântico.</li>
+                <li><strong>Interação:</strong> Clique na bandeira no relevo para ser teletransportado diretamente para o vídeo imersivo 360°.</li>
+            </ul>
+            <p style="font-size: 11px; color: #94a3b8; margin-bottom: 0;">
+                Desenvolvido com Three.js e tecnologia WebGL.
+            </p>
+        </div>
+    </div>
+
+    <!-- Protocol Alert Banner (if opened via file://) -->
+    <div id="protocol-alert">
+        <span>⚠️ Para streaming fluido do vídeo 360° sem bloqueio CORS do navegador, execute pelo <strong>iniciar_webgis.bat</strong> (servidor local).</span>
+    </div>
+
+    <!-- MAIN JAVASCRIPT APP (ES Module) -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // Check protocol
+        if (window.location.protocol === 'file:') {
+            const alertElem = document.getElementById('protocol-alert');
+            if (alertElem) alertElem.style.display = 'flex';
+        }
+
+        // ==========================================
+        // 1. APP STATE & GIS CONFIG
+        // ==========================================
+        // Exact QGIS2threejs transform parameters for this project
+        const GIS_SCALE = 0.0009969811875810129;
+        const GIS_ORIGIN_X = 729417.415216606;
+        const GIS_ORIGIN_Y = 6907179.27906788;
+
+        // User requested UTM point: 724995, 6925439 UTM SC 22 SUL
+        const TARGET_UTM_X = 724995.0;
+        const TARGET_UTM_Y = 6925439.0;
+
+        function utmToWorld(utmX, utmY) {
+            return {
+                x: (utmX - GIS_ORIGIN_X) * GIS_SCALE,
+                z: -((utmY - GIS_ORIGIN_Y) * GIS_SCALE)
+            };
+        }
+
+        const initialTargetPos = utmToWorld(TARGET_UTM_X, TARGET_UTM_Y);
+
+        const state = {
+            mode: 'GIS_3D', // 'GIS_3D' or 'VR_360'
+            isTransitioning: false,
+            autoRotate: false,
+            sunSunset: false,
+            cloudsVisible: true,
+            flagPosition: new THREE.Vector3(initialTargetPos.x, 4.614, initialTargetPos.z),
+            flagWorldPos: new THREE.Vector3(),
+            terrainMesh: null,
+            cloudsNode: null,
+            sedeNode: null,
+            isVrDragging: false,
+            vrPrevMouse: { x: 0, y: 0 },
+            vrAutoPan: true,
+            vrFov: 75
+        };
+
+        // UI Elements
+        const canvas = document.getElementById('webgl-canvas');
+        const flagPin = document.getElementById('flag-pin');
+        const flagPinCard = document.getElementById('flag-pin-card');
+        const teleportOverlay = document.getElementById('teleport-overlay');
+        const teleportText = document.getElementById('teleport-text');
+        const vrPlayerUi = document.getElementById('vr-player-ui');
+        const btnBackToGis = document.getElementById('btn-back-to-gis');
+        const hudModeText = document.getElementById('hud-mode-text');
+        const loadingScreen = document.getElementById('loading-screen');
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingDesc = document.getElementById('loading-desc');
+        const vrTimeline = document.getElementById('vr-timeline');
+        const vrTimeDisplay = document.getElementById('vr-time');
+        const vrBtnPlay = document.getElementById('vr-btn-play');
+        const vrIconPlay = document.getElementById('vr-icon-play');
+        const vrLblPlay = document.getElementById('vr-lbl-play');
+        const vrBtnMute = document.getElementById('vr-btn-mute');
+        const vrIconMute = document.getElementById('vr-icon-mute');
+        const vrVol = document.getElementById('vr-vol');
+        const vrBtnPan = document.getElementById('vr-btn-pan');
+        const vrBtnFullscreen = document.getElementById('vr-btn-fullscreen');
+        const vrHeading = document.getElementById('vr-heading');
+
+        // ==========================================
+        // 2. SCENE, CAMERA, RENDERER SETUP
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0c1424);
+        scene.fog = new THREE.FogExp2(0x0c1424, 0.0035);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
+        camera.position.set(25, 35, 45);
+
+        const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            powerPreference: 'high-performance'
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2.05; // Prevent flipping underneath terrain
+        controls.minDistance = 2;
+        controls.maxDistance = 250;
+        controls.target.set(0, 2, 0);
+
+        // ==========================================
+        // 3. LIGHTING RIG
+        // ==========================================
+        const ambientLight = new THREE.AmbientLight(0xddeeff, 1.2);
+        scene.add(ambientLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334455, 0.8);
+        hemiLight.position.set(0, 50, 0);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 2.4);
+        sunLight.position.set(40, 60, 30);
+        scene.add(sunLight);
+
+        const fillLight = new THREE.DirectionalLight(0x60a5fa, 0.6);
+        fillLight.position.set(-40, 20, -30);
+        scene.add(fillLight);
+
+        // ==========================================
+        // 4. PROCEDURAL 3D ANIMATED FLAG & BEACON
+        // ==========================================
+        const flagGroup = new THREE.Group();
+        flagGroup.name = "FLAG_PICO_DA_BANDEIRA";
+        scene.add(flagGroup);
+
+        // 4.1 Base Pedestal
+        const baseGeom = new THREE.CylinderGeometry(0.35, 0.5, 0.15, 24);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x334155,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const baseMesh = new THREE.Mesh(baseGeom, baseMat);
+        baseMesh.position.y = 0.075;
+        flagGroup.add(baseMesh);
+
+        // 4.2 Mast (Pole)
+        const poleGeom = new THREE.CylinderGeometry(0.04, 0.05, 3.2, 16);
+        const poleMat = new THREE.MeshStandardMaterial({
+            color: 0xf1f5f9,
+            metalness: 0.85,
+            roughness: 0.2
+        });
+        const poleMesh = new THREE.Mesh(poleGeom, poleMat);
+        poleMesh.position.y = 1.6;
+        flagGroup.add(poleMesh);
+
+        // 4.3 Golden Spearhead / Finial
+        const finialGeom = new THREE.SphereGeometry(0.1, 16, 16);
+        const finialMat = new THREE.MeshStandardMaterial({
+            color: 0xfbbf24,
+            metalness: 0.9,
+            roughness: 0.15,
+            emissive: 0xd97706,
+            emissiveIntensity: 0.3
+        });
+        const finialMesh = new THREE.Mesh(finialGeom, finialMat);
+        finialMesh.position.y = 3.25;
+        flagGroup.add(finialMesh);
+
+        // 4.4 Cloth Flag (Procedural wave animation)
+        const flagClothGeom = new THREE.PlaneGeometry(1.6, 1.0, 24, 16);
+        // Translate origin so left edge is attached to mast
+        flagClothGeom.translate(0.8, 0, 0);
+
+        // Create high-res dynamic texture for the flag
+        const flagCanvas = document.createElement('canvas');
+        flagCanvas.width = 512;
+        flagCanvas.height = 320;
+        const ctx = flagCanvas.getContext('2d');
+
+        // Draw vibrant flag background
+        const flagGrad = ctx.createLinearGradient(0, 0, 512, 320);
+        flagGrad.addColorStop(0, '#dc2626');
+        flagGrad.addColorStop(0.5, '#ef4444');
+        flagGrad.addColorStop(1, '#b91c1c');
+        ctx.fillStyle = flagGrad;
+        ctx.fillRect(0, 0, 512, 320);
+
+        // Gold border
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(10, 10, 492, 300);
+
+        // Center badge
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 38px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🚩 360° VR', 256, 130);
+
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 26px sans-serif';
+        ctx.fillText('PICO DA BANDEIRA', 256, 185);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('724995 E • 6925439 N • 1.043m', 256, 230);
+
+        const flagTex = new THREE.CanvasTexture(flagCanvas);
+        flagTex.colorSpace = THREE.SRGBColorSpace;
+
+        const flagClothMat = new THREE.MeshStandardMaterial({
+            map: flagTex,
+            side: THREE.DoubleSide,
+            roughness: 0.4,
+            metalness: 0.1
+        });
+        const flagClothMesh = new THREE.Mesh(flagClothGeom, flagClothMat);
+        flagClothMesh.position.set(0.04, 2.65, 0);
+        flagGroup.add(flagClothMesh);
+
+        // Save original vertex positions for fluttering animation
+        const clothPosAttr = flagClothGeom.attributes.position;
+        const clothOrigPositions = clothPosAttr.array.slice();
+
+        // 4.5 Glowing Radar Beacon Pulse Ring
+        const ringGeom = new THREE.RingGeometry(0.4, 0.6, 32);
+        ringGeom.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xef4444,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        const beaconRing = new THREE.Mesh(ringGeom, ringMat);
+        beaconRing.position.y = 0.05;
+        flagGroup.add(beaconRing);
+
+        // Secondary outer pulse ring
+        const ringGeom2 = new THREE.RingGeometry(0.8, 0.95, 32);
+        ringGeom2.rotateX(-Math.PI / 2);
+        const ringMat2 = new THREE.MeshBasicMaterial({
+            color: 0xf59e0b,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.5
+        });
+        const beaconRing2 = new THREE.Mesh(ringGeom2, ringMat2);
+        beaconRing2.position.y = 0.06;
+        flagGroup.add(beaconRing2);
+
+        // ==========================================
+        // 5. 360° VIDEO IMMERSION ENGINE
+        // ==========================================
+        const vrScene = new THREE.Scene();
+        const vrCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        vrCamera.position.set(0, 0, 0);
+
+        // 360 Video Sphere
+        const vrSphereGeom = new THREE.SphereGeometry(500, 64, 64);
+        vrSphereGeom.scale(-1, 1, 1); // Invert so inside is visible
+
+        const video = document.createElement('video');
+        video.src = encodeURI('Video 360 Pico da Bandeira/SEU_VIDEO_360.mp4');
+        video.crossOrigin = 'anonymous';
+        video.loop = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+
+        const vrVideoTex = new THREE.VideoTexture(video);
+        vrVideoTex.colorSpace = THREE.SRGBColorSpace;
+        vrVideoTex.minFilter = THREE.LinearFilter;
+        vrVideoTex.magFilter = THREE.LinearFilter;
+
+        const vrSphereMat = new THREE.MeshBasicMaterial({ map: vrVideoTex });
+        const vrSphereMesh = new THREE.Mesh(vrSphereGeom, vrSphereMat);
+        vrScene.add(vrSphereMesh);
+
+        // 360 Camera Spherical Look Angles
+        let vrYaw = 0;   // horizontal rotation
+        let vrPitch = 0; // vertical rotation
+
+        // ==========================================
+        // 6. LOAD 3D MODEL (MAQUETE SERRA DO TABULEIRO)
+        // ==========================================
+        const gltfLoader = new GLTFLoader();
+        const modelUrl = 'modelos/MAQUETE SERRA DO TABULEIRO.gltf';
+
+        loadingDesc.innerText = 'Carregando malha topográfica 3D da Serra...';
+        loadingBar.style.width = '35%';
+
+        gltfLoader.load(
+            modelUrl,
+            (gltf) => {
+                loadingBar.style.width = '85%';
+                loadingDesc.innerText = 'Processando relevo e ajustando coordenadas do WebGIS...';
+
+                const rootModel = gltf.scene;
+                scene.add(rootModel);
+
+                // Analyze model nodes
+                rootModel.traverse((child) => {
+                    if (child.name === 'SRTM-EX4' || (child.isMesh && child.name === '')) {
+                        if (!state.terrainMesh && child.isMesh) {
+                            state.terrainMesh = child;
+                        }
+                    }
+                    if (child.name === 'pontos aleatorios para nuvem') {
+                        state.cloudsNode = child;
+                    }
+                    if (child.name === 'localizacao da sede') {
+                        state.sedeNode = child;
+                    }
+                });
+
+                // Update world matrices
+                rootModel.updateMatrixWorld(true);
+
+                // Specifically identify the terrain ground mesh (child of SRTM-EX4, never clouds)
+                let terrainMesh = null;
+                rootModel.traverse((child) => {
+                    if (child.name === 'pontos aleatorios para nuvem') {
+                        state.cloudsNode = child;
+                    }
+                    if (child.name === 'localizacao da sede') {
+                        state.sedeNode = child;
+                    }
+                    if (child.isMesh && child.name !== 'side' && child.name !== 'bottom') {
+                        let p = child.parent;
+                        while (p) {
+                            if (p.name === 'SRTM-EX4') {
+                                terrainMesh = child;
+                                break;
+                            }
+                            p = p.parent;
+                        }
+                    }
+                });
+                state.terrainMesh = terrainMesh;
+
+                // User's exact UTM SC 22S point: 724995, 6925439 (Pico da Bandeira / Cambirela)
+                const targetWorld = utmToWorld(TARGET_UTM_X, TARGET_UTM_Y);
+                let flagTargetPos = new THREE.Vector3(targetWorld.x, 0, targetWorld.z);
+
+                // Raycast EXCLUSIVELY onto the terrain mesh (never hits clouds or side walls)
+                if (terrainMesh) {
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.set(new THREE.Vector3(flagTargetPos.x, 50, flagTargetPos.z), new THREE.Vector3(0, -1, 0));
+                    const hits = raycaster.intersectObject(terrainMesh, false);
+                    if (hits.length > 0) {
+                        flagTargetPos.y = hits[0].point.y;
+                    } else {
+                        flagTargetPos.y = 4.614;
+                    }
+                } else {
+                    flagTargetPos.y = 4.614;
+                }
+
+                // Place the flag firmly on the mountain surface
+                flagGroup.position.copy(flagTargetPos);
+                state.flagWorldPos.copy(flagTargetPos);
+
+                // Initial camera orientation framing the mountain peak and the flag
+                camera.position.set(flagTargetPos.x + 8, flagTargetPos.y + 4.5, flagTargetPos.z + 12);
+                controls.target.set(flagTargetPos.x, flagTargetPos.y + 0.8, flagTargetPos.z);
+                controls.update();
+
+                // Finish loading
+                loadingBar.style.width = '100%';
+                setTimeout(() => {
+                    loadingScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                    }, 600);
+                }, 400);
+            },
+            (xhr) => {
+                if (xhr.lengthComputable && xhr.total > 0) {
+                    const pct = Math.round((xhr.loaded / xhr.total) * 100);
+                    loadingBar.style.width = Math.max(35, pct) + '%';
+                    loadingDesc.innerText = `Baixando modelo 3D: ${pct}%...`;
+                }
+            },
+            (error) => {
+                console.error("Erro ao carregar GLTF:", error);
+                loadingDesc.innerHTML = `<span style="color:#ef4444;">Erro ao carregar modelo 3D. Execute iniciar_webgis.bat!</span>`;
+            }
+        );
+
+        // ==========================================
+        // 7. INTERACTIVE TELEPORTATION (GIS -> 360°)
+        // ==========================================
+        function teleportTo360() {
+            if (state.isTransitioning || state.mode === 'VR_360') return;
+            state.isTransitioning = true;
+
+            teleportText.innerText = "TELETRANSPORTANDO PARA O VÍDEO 360° DO PICO DA BANDEIRA...";
+            teleportOverlay.classList.add('active');
+
+            // Sound effect synthesis via Web Audio API (sci-fi swoosh)
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    const ctx = new AudioCtx();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(160, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(780, ctx.currentTime + 0.7);
+                    gain.gain.setValueAtTime(0.01, ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.3);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.8);
+                }
+            } catch (e) {}
+
+            // Smooth camera dive towards the flag before switching
+            const startCamPos = camera.position.clone();
+            const targetCamPos = flagGroup.position.clone().add(new THREE.Vector3(0, 1.8, 0.5));
+            const diveStartTime = performance.now();
+            const diveDuration = 800;
+
+            function animateDive(time) {
+                const elapsed = time - diveStartTime;
+                const progress = Math.min(elapsed / diveDuration, 1);
+                const ease = progress * progress * (3 - 2 * progress); // smoothstep
+
+                camera.position.lerpVectors(startCamPos, targetCamPos, ease);
+                controls.target.lerp(flagGroup.position, ease);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateDive);
+                } else {
+                    // Switch to 360 Mode
+                    state.mode = 'VR_360';
+                    hudModeText.innerText = 'Imersão 360° VR';
+                    document.getElementById('hud-mode-pill').style.display = 'none';
+                    document.getElementById('hud-tools').style.display = 'none';
+                    document.getElementById('hud-status').style.display = 'none';
+                    flagPin.style.display = 'none';
+                    vrPlayerUi.classList.add('active');
+
+                    // Start 360 video playback
+                    video.play().then(() => {
+                        vrIconPlay.innerText = '⏸️';
+                        vrLblPlay.innerText = 'Pausar';
+                    }).catch((err) => {
+                        console.log("Autoplay bloqueado pelo navegador:", err);
+                        vrIconPlay.innerText = '▶️';
+                        vrLblPlay.innerText = 'Tocar';
+                    });
+
+                    setTimeout(() => {
+                        teleportOverlay.classList.remove('active');
+                        state.isTransitioning = false;
+                    }, 400);
+                }
+            }
+            requestAnimationFrame(animateDive);
+        }
+
+        function returnToGis() {
+            if (state.isTransitioning || state.mode === 'GIS_3D') return;
+            state.isTransitioning = true;
+
+            teleportText.innerText = "RETORNANDO AO MAPA 3D DA SERRA DO TABULEIRO...";
+            teleportOverlay.classList.add('active');
+
+            setTimeout(() => {
+                video.pause();
+                state.mode = 'GIS_3D';
+                hudModeText.innerText = 'Modo Terreno 3D';
+                document.getElementById('hud-mode-pill').style.display = 'flex';
+                document.getElementById('hud-tools').style.display = 'flex';
+                document.getElementById('hud-status').style.display = 'flex';
+                flagPin.style.display = 'flex';
+                vrPlayerUi.classList.remove('active');
+
+                // Restore camera above mountain peak
+                camera.position.set(flagGroup.position.x + 8, flagGroup.position.y + 4.5, flagGroup.position.z + 12);
+                controls.target.set(flagGroup.position.x, flagGroup.position.y + 0.8, flagGroup.position.z);
+                controls.update();
+
+                setTimeout(() => {
+                    teleportOverlay.classList.remove('active');
+                    state.isTransitioning = false;
+                }, 300);
+            }, 600);
+        }
+
+        // ==========================================
+        // 8. 360° VIDEO CONTROLS & TIMELINE
+        // ==========================================
+        video.addEventListener('timeupdate', () => {
+            if (!video.duration) return;
+            const pct = (video.currentTime / video.duration) * 100;
+            vrTimeline.value = pct;
+
+            const curMin = Math.floor(video.currentTime / 60).toString().padStart(2, '0');
+            const curSec = Math.floor(video.currentTime % 60).toString().padStart(2, '0');
+            const durMin = Math.floor(video.duration / 60).toString().padStart(2, '0');
+            const durSec = Math.floor(video.duration % 60).toString().padStart(2, '0');
+            vrTimeDisplay.innerText = `${curMin}:${curSec} / ${durMin}:${durSec}`;
+        });
+
+        vrTimeline.addEventListener('input', () => {
+            if (!video.duration) return;
+            video.currentTime = (vrTimeline.value / 100) * video.duration;
+        });
+
+        vrBtnPlay.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+                vrIconPlay.innerText = '⏸️';
+                vrLblPlay.innerText = 'Pausar';
+            } else {
+                video.pause();
+                vrIconPlay.innerText = '▶️';
+                vrLblPlay.innerText = 'Tocar';
+            }
+        });
+
+        vrBtnMute.addEventListener('click', () => {
+            video.muted = !video.muted;
+            vrIconMute.innerText = video.muted ? '🔇' : '🔊';
+        });
+
+        vrVol.addEventListener('input', (e) => {
+            video.volume = parseFloat(e.target.value);
+            video.muted = false;
+            vrIconMute.innerText = video.volume === 0 ? '🔇' : '🔊';
+        });
+
+        vrBtnPan.addEventListener('click', () => {
+            state.vrAutoPan = !state.vrAutoPan;
+            vrBtnPan.classList.toggle('active', state.vrAutoPan);
+        });
+
+        vrBtnFullscreen.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        });
+
+        btnBackToGis.addEventListener('click', returnToGis);
+        flagPinCard.addEventListener('click', teleportTo360);
+
+        // ==========================================
+        // 9. WEBGIS TOOLBAR BUTTONS
+        // ==========================================
+        document.getElementById('btn-focus-flag').addEventListener('click', () => {
+            teleportTo360();
+        });
+
+        document.getElementById('btn-reset-cam').addEventListener('click', () => {
+            const startPos = camera.position.clone();
+            const targetPos = new THREE.Vector3(25, 35, 45);
+            animateCameraMove(startPos, targetPos, new THREE.Vector3(0, 2, 0));
+        });
+
+        document.getElementById('btn-top-view').addEventListener('click', () => {
+            const startPos = camera.position.clone();
+            const targetPos = new THREE.Vector3(0, 75, 0.1);
+            animateCameraMove(startPos, targetPos, new THREE.Vector3(0, 0, 0));
+        });
+
+        document.getElementById('btn-toggle-clouds').addEventListener('click', () => {
+            state.cloudsVisible = !state.cloudsVisible;
+            if (state.cloudsNode) {
+                state.cloudsNode.visible = state.cloudsVisible;
+            }
+            document.getElementById('lbl-clouds').innerText = state.cloudsVisible ? 'Ocultar Nuvens' : 'Exibir Nuvens';
+        });
+
+        document.getElementById('btn-toggle-sun').addEventListener('click', () => {
+            state.sunSunset = !state.sunSunset;
+            if (state.sunSunset) {
+                scene.background.set(0x1a0f1e);
+                scene.fog.color.set(0x1a0f1e);
+                sunLight.color.set(0xf97316);
+                sunLight.intensity = 3.2;
+                sunLight.position.set(-60, 15, 20);
+                ambientLight.color.set(0x9333ea);
+                ambientLight.intensity = 0.9;
+                document.getElementById('lbl-sun').innerText = 'Luz do Dia';
+            } else {
+                scene.background.set(0x0c1424);
+                scene.fog.color.set(0x0c1424);
+                sunLight.color.set(0xfffaed);
+                sunLight.intensity = 2.4;
+                sunLight.position.set(40, 60, 30);
+                ambientLight.color.set(0xddeeff);
+                ambientLight.intensity = 1.2;
+                document.getElementById('lbl-sun').innerText = 'Pôr do Sol';
+            }
+        });
+
+        document.getElementById('btn-auto-rotate').addEventListener('click', () => {
+            state.autoRotate = !state.autoRotate;
+            controls.autoRotate = state.autoRotate;
+            controls.autoRotateSpeed = 1.0;
+            document.getElementById('btn-auto-rotate').classList.toggle('active', state.autoRotate);
+        });
+
+        // Modal Info
+        const infoModal = document.getElementById('info-modal');
+        document.getElementById('btn-info').addEventListener('click', () => {
+            infoModal.classList.add('open');
+        });
+        document.getElementById('modal-close').addEventListener('click', () => {
+            infoModal.classList.remove('open');
+        });
+        infoModal.addEventListener('click', (e) => {
+            if (e.target === infoModal) infoModal.classList.remove('open');
+        });
+
+        // Smooth Camera Transition Utility
+        function animateCameraMove(fromPos, toPos, targetLookAt) {
+            const startTime = performance.now();
+            const duration = 1000;
+            const startTarget = controls.target.clone();
+
+            function step(time) {
+                const elapsed = time - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = progress * progress * (3 - 2 * progress);
+
+                camera.position.lerpVectors(fromPos, toPos, ease);
+                controls.target.lerpVectors(startTarget, targetLookAt, ease);
+                controls.update();
+
+                if (progress < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // ==========================================
+        // 10. RAYCASTING ON 3D FLAG (CLICK & HOVER)
+        // ==========================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            if (state.mode === 'GIS_3D') {
+                raycaster.setFromCamera(mouse, camera);
+                const flagHits = raycaster.intersectObjects(flagGroup.children, true);
+                if (flagHits.length > 0) {
+                    canvas.style.cursor = 'pointer';
+                    flagClothMat.emissive.set(0xffffff);
+                    flagClothMat.emissiveIntensity = 0.25;
+                } else {
+                    canvas.style.cursor = 'grab';
+                    flagClothMat.emissive.set(0x000000);
+                    flagClothMat.emissiveIntensity = 0;
+                }
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if (state.mode === 'GIS_3D') {
+                raycaster.setFromCamera(mouse, camera);
+                const flagHits = raycaster.intersectObjects(flagGroup.children, true);
+                if (flagHits.length > 0) {
+                    teleportTo360();
+                }
+            }
+        });
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && state.mode === 'VR_360') {
+                e.preventDefault();
+                vrBtnPlay.click();
+            }
+            if (e.code === 'Escape' && state.mode === 'VR_360') {
+                returnToGis();
+            }
+        });
+
+        // ==========================================
+        // 11. 360° DRAG & TOUCH LOOK-AROUND
+        // ==========================================
+        canvas.addEventListener('mousedown', (e) => {
+            if (state.mode === 'VR_360') {
+                state.isVrDragging = true;
+                state.vrPrevMouse.x = e.clientX;
+                state.vrPrevMouse.y = e.clientY;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            state.isVrDragging = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (state.mode === 'VR_360' && state.isVrDragging) {
+                const deltaX = e.clientX - state.vrPrevMouse.x;
+                const deltaY = e.clientY - state.vrPrevMouse.y;
+
+                vrYaw -= deltaX * 0.0035;
+                vrPitch += deltaY * 0.0035;
+
+                // Clamp pitch so camera doesn't flip
+                const limit = Math.PI / 2 - 0.05;
+                vrPitch = Math.max(-limit, Math.min(limit, vrPitch));
+
+                state.vrPrevMouse.x = e.clientX;
+                state.vrPrevMouse.y = e.clientY;
+            }
+        });
+
+        // Touch support for 360 mode
+        canvas.addEventListener('touchstart', (e) => {
+            if (state.mode === 'VR_360' && e.touches.length === 1) {
+                state.isVrDragging = true;
+                state.vrPrevMouse.x = e.touches[0].clientX;
+                state.vrPrevMouse.y = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (state.mode === 'VR_360' && state.isVrDragging && e.touches.length === 1) {
+                const deltaX = e.touches[0].clientX - state.vrPrevMouse.x;
+                const deltaY = e.touches[0].clientY - state.vrPrevMouse.y;
+
+                vrYaw -= deltaX * 0.004;
+                vrPitch += deltaY * 0.004;
+                const limit = Math.PI / 2 - 0.05;
+                vrPitch = Math.max(-limit, Math.min(limit, vrPitch));
+
+                state.vrPrevMouse.x = e.touches[0].clientX;
+                state.vrPrevMouse.y = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', () => {
+            state.isVrDragging = false;
+        });
+
+        // 360 FOV Zoom with Mouse Wheel
+        canvas.addEventListener('wheel', (e) => {
+            if (state.mode === 'VR_360') {
+                e.preventDefault();
+                state.vrFov = Math.max(35, Math.min(95, state.vrFov + e.deltaY * 0.05));
+                vrCamera.fov = state.vrFov;
+                vrCamera.updateProjectionMatrix();
+            }
+        }, { passive: false });
+
+        // ==========================================
+        // 12. SCREEN-SPACE PROJECTION FOR 3D PIN
+        // ==========================================
+        const tempVec = new THREE.Vector3();
+
+        function updateScreenPin() {
+            if (state.mode !== 'GIS_3D' || !flagGroup.visible) {
+                flagPin.style.display = 'none';
+                return;
+            }
+
+            tempVec.copy(flagGroup.position).add(new THREE.Vector3(0, 3.4, 0));
+            tempVec.project(camera);
+
+            // Check if point is behind camera
+            if (tempVec.z > 1) {
+                flagPin.style.display = 'none';
+                return;
+            }
+
+            const x = (tempVec.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(tempVec.y * 0.5) + 0.5) * window.innerHeight;
+
+            flagPin.style.display = 'flex';
+            flagPin.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+        }
+
+        // ==========================================
+        // 13. MAIN ANIMATION & RENDER LOOP
+        // ==========================================
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+
+            if (state.mode === 'GIS_3D') {
+                // Procedural fluttering flag wave
+                const pos = clothPosAttr.array;
+                for (let i = 0; i < clothPosAttr.count; i++) {
+                    const u = clothOrigPositions[i * 3];     // X along cloth width (0 to 1.6)
+                    const v = clothOrigPositions[i * 3 + 1]; // Y height
+                    const waveFactor = u / 1.6;              // Mast attachment has 0 wave, free end waves strongly
+
+                    const zOffset = Math.sin(u * 5.0 - elapsedTime * 7.0) * 0.12 * waveFactor +
+                                    Math.cos(v * 6.0 + elapsedTime * 4.0) * 0.04 * waveFactor;
+
+                    pos[i * 3 + 2] = zOffset;
+                }
+                clothPosAttr.needsUpdate = true;
+                flagClothGeom.computeVertexNormals();
+
+                // Pulsating radar beacon ring
+                const pulse = (elapsedTime * 1.5) % 1;
+                beaconRing.scale.set(1 + pulse * 2.5, 1 + pulse * 2.5, 1);
+                ringMat.opacity = (1 - pulse) * 0.85;
+
+                const pulse2 = ((elapsedTime * 1.5) + 0.5) % 1;
+                beaconRing2.scale.set(1 + pulse2 * 3.2, 1 + pulse2 * 3.2, 1);
+                ringMat2.opacity = (1 - pulse2) * 0.5;
+
+                // Update orbit controls
+                controls.update();
+
+                // Render 3D terrain scene
+                renderer.render(scene, camera);
+
+                // Update 2D Pin on screen
+                updateScreenPin();
+
+            } else if (state.mode === 'VR_360') {
+                // Auto pan in 360 mode if enabled
+                if (state.vrAutoPan && !state.isVrDragging) {
+                    vrYaw += 0.0008;
+                }
+
+                // Compute camera look direction from yaw and pitch
+                const dirX = Math.sin(vrYaw) * Math.cos(vrPitch);
+                const dirY = Math.sin(vrPitch);
+                const dirZ = -Math.cos(vrYaw) * Math.cos(vrPitch);
+
+                vrCamera.lookAt(dirX, dirY, dirZ);
+
+                // Update heading readout in HUD
+                let deg = Math.round(((vrYaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) * (180 / Math.PI));
+                let cardinal = 'NORTE';
+                if (deg >= 45 && deg < 135) cardinal = 'LESTE';
+                else if (deg >= 135 && deg < 225) cardinal = 'SUL';
+                else if (deg >= 225 && deg < 315) cardinal = 'OESTE';
+                vrHeading.innerText = `${cardinal} ${deg}°`;
+
+                // Render 360 sphere
+                renderer.render(vrScene, vrCamera);
+            }
+        }
+
+        animate();
+
+        // ==========================================
+        // 14. WINDOW RESIZE HANDLER
+        // ==========================================
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+
+            vrCamera.aspect = w / h;
+            vrCamera.updateProjectionMatrix();
+
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        });
+
+    </script>
+</body>
+</html>

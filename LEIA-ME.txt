@@ -1,0 +1,48 @@
+========================================================================
+ WEBGIS 3D • PARQUE ESTADUAL DA SERRA DO TABULEIRO COM VÍDEO 360°
+========================================================================
+
+Como executar o WebGIS:
+-----------------------
+1. Dê um duplo-clique no arquivo:
+   ▶ iniciar_webgis.bat
+
+2. O navegador padrão será aberto automaticamente em:
+   http://localhost:8080/index.html
+
+Recursos disponíveis no WebGIS:
+-------------------------------
+• Navegação no Terreno 3D:
+  - Botão esquerdo do mouse: Girar / orbitar a maquete da serra.
+  - Botão direito do mouse: Arrastar / pan.
+  - Scroll do mouse: Zoom in / zoom out.
+
+• Ponto Interativo da Bandeira (Pico da Bandeira / Cambirela):
+  - No relevo 3D há um mastro com bandeira ondulante e anel de radar pulsante.
+  - Ao clicar na bandeira ou no card flutuante "Pico da Bandeira (360°)",
+    uma transição cinemática com mergulho de câmera teletransporta você
+    diretamente para a experiência do VÍDEO 360° VR 4K gravado naquele local!
+
+• Controles do Vídeo 360°:
+  - Clique e arraste para olhar em qualquer direção (360° x 180°).
+  - Scroll do mouse ajusta o campo de visão (zoom panorâmico).
+  - Barra de mídia completa: Play/Pause (ou barra de espaço), controle de tempo,
+    volume, rotação automática (pan) e modo tela cheia.
+  - Para retornar à maquete 3D, basta clicar no botão verde:
+    "← VOLTAR AO WEBGIS 3D".
+
+• Ferramentas GIS:
+  - Alternância de nuvens volumétricas (ligar/desligar).
+  - Modo Pôr do Sol e Luz do Dia.
+  - Vistas pré-configuradas (Visão Geral, Vista Aérea Nadir).
+  - Leitura contínua de coordenadas UTM Fuso 22S e altitude MDE.
+
+Estrutura dos arquivos:
+-----------------------
+• index.html                  -> Aplicação principal do WebGIS 3D.
+• iniciar_webgis.bat          -> Inicializador em 1 clique para Windows.
+• server.ps1                  -> Servidor local otimizado com streaming HTTP 206 Range.
+• modelos/                    -> Maquete 3D da Serra do Tabuleiro (.gltf).
+• Video 360 Pico da Bandeira/ -> Vídeo 360° em 4K (.mp4).
+• libs/                       -> Bibliotecas Three.js completas (funciona 100% offline).
+========================================================================
