@@ -49,20 +49,30 @@ geometry.scale(-1, 1, 1);
 // VÍDEO 360°
 // ==================================================
 
-const video = document.createElement('video');
+const GITHUB_LFS_MEDIA_URL = 'https://media.githubusercontent.com/media/eriksdhoffmann/3d_Serra_do_Tabuleiro/main/Video%20360%20Pico%20da%20Bandeira/SEU_VIDEO_360.mp4';
+const LOCAL_VIDEO_URL = 'SEU_VIDEO_360.mp4';
 
-// IMPORTANTE:
-// O vídeo deve estar na mesma pasta do Video.html
-video.src = 'SEU_VIDEO_360.mp4';
+const isRemoteHost = window.location.hostname.includes('github.io') || 
+                     (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && window.location.protocol !== 'file:');
+
+const video = document.createElement('video');
+video.src = isRemoteHost ? GITHUB_LFS_MEDIA_URL : LOCAL_VIDEO_URL;
 
 video.crossOrigin = 'anonymous';
-
 video.loop = true;
 video.muted = true;
 video.playsInline = true;
 
 video.setAttribute('playsinline', '');
 video.setAttribute('webkit-playsinline', '');
+
+video.addEventListener('error', () => {
+    if (video.src !== GITHUB_LFS_MEDIA_URL) {
+        video.src = GITHUB_LFS_MEDIA_URL;
+        video.load();
+        video.play().catch(console.error);
+    }
+});
 
 
 // Tenta iniciar o vídeo

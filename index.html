@@ -889,8 +889,8 @@
                         <span id="vr-lbl-play">Pausar</span>
                     </button>
                     <div class="volume-container">
-                        <button class="vr-ctrl-btn" id="vr-btn-mute">
-                            <span id="vr-icon-mute">🔊</span>
+                        <button class="vr-ctrl-btn" id="vr-btn-mute" title="Ativar / Desativar Som">
+                            <span id="vr-icon-mute">🔇</span>
                         </button>
                         <input type="range" class="vr-volume-slider" id="vr-vol" min="0" max="1" step="0.05" value="1">
                     </div>
@@ -1202,13 +1202,35 @@
         const vrSphereGeom = new THREE.SphereGeometry(500, 64, 64);
         vrSphereGeom.scale(-1, 1, 1); // Invert so inside is visible
 
+        // GitHub LFS media stream URL (resolves Git LFS pointer on GitHub Pages)
+        const GITHUB_LFS_MEDIA_URL = 'https://media.githubusercontent.com/media/eriksdhoffmann/3d_Serra_do_Tabuleiro/main/Video%20360%20Pico%20da%20Bandeira/SEU_VIDEO_360.mp4';
+        const LOCAL_VIDEO_URL = encodeURI('Video 360 Pico da Bandeira/SEU_VIDEO_360.mp4');
+
+        // Automatically choose GitHub LFS media stream if on github.io or remote server
+        const isRemoteHost = window.location.hostname.includes('github.io') || 
+                             (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && window.location.protocol !== 'file:');
+
         const video = document.createElement('video');
-        video.src = encodeURI('Video 360 Pico da Bandeira/SEU_VIDEO_360.mp4');
         video.crossOrigin = 'anonymous';
         video.loop = true;
+        video.muted = true; // Muted initially to guarantee browser autoplay compliance
         video.playsInline = true;
+        video.preload = 'auto';
         video.setAttribute('playsinline', '');
         video.setAttribute('webkit-playsinline', '');
+        video.src = isRemoteHost ? GITHUB_LFS_MEDIA_URL : LOCAL_VIDEO_URL;
+
+        // Auto fallback to GitHub LFS media URL if local relative URL fails or is a Git LFS pointer
+        video.addEventListener('error', (e) => {
+            console.warn("Falha no carregamento local ou Git LFS pointer detectado. Alternando para GitHub LFS Media CDN...", e);
+            if (video.src !== GITHUB_LFS_MEDIA_URL) {
+                video.src = GITHUB_LFS_MEDIA_URL;
+                video.load();
+                if (state.mode === 'VR_360') {
+                    video.play().catch(console.error);
+                }
+            }
+        });
 
         const vrVideoTex = new THREE.VideoTexture(video);
         vrVideoTex.colorSpace = THREE.SRGBColorSpace;
